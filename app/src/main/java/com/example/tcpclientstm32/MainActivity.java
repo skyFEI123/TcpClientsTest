@@ -26,7 +26,7 @@ import android.view.View.OnClickListener;
 import android.widget.Toast;
 
 public class MainActivity extends AppCompatActivity {
-    private static final String TAG = "MyApplication";
+    private static final String TAG = "MainActivity";
     Button ConnectButton; // 定义连接按钮
 
     boolean Connected = false;
