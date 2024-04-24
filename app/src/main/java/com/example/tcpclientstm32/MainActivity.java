@@ -2,6 +2,12 @@ package com.example.tcpclientstm32;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import android.content.ContentResolver;
+import android.content.ContentValues;
+import android.content.Context;
+import android.content.Intent;
+import android.database.Cursor;
+import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
@@ -25,10 +31,11 @@ import java.util.concurrent.Executors;
 import android.view.View.OnClickListener;
 import android.widget.Toast;
 
+import com.example.tcpclientstm32.util.PersonInfo;
+
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "MainActivity";
     Button ConnectButton; // 定义连接按钮
-
     boolean Connected = false;
     Socket socket = null; // 定义socket
     private OutputStream outputStream = null; // 定义输出流（发送）
@@ -43,16 +50,10 @@ public class MainActivity extends AppCompatActivity {
     private String msg;
 
     //UI控件绑定变量
-    TextView textViewTemperature, textViewHeart, textViewPress, textViewTitle, textViewResult, textViewTmpResult, textViewHeartResult, textViewPressResult;
-    EditText editTextHeart, editTextTemp, editTextPress, editTextResult;
-    Button buttonHeart, buttonTemp, buttonPress, buttonResult, buttonBack;
-    String heartThreshold;
-    String tempThreshold;
-    String pressThreshold;
-
-    final String[] tempTemp = new String[1];
-    final String[] pressTemp = new String[1];
-    final String[] heartTemp = new String[1];
+    TextView textViewTemperature, textViewHeart, textViewPress;
+    EditText editTextHeart, editTextTemp, editTextPress;
+    Button buttonHeart, buttonTemp, buttonPress, buttonResult;
+    private Context mContext = Myapplication.getContext();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -64,22 +65,15 @@ public class MainActivity extends AppCompatActivity {
         textViewTemperature = (TextView) findViewById(R.id.textViewTemperature);
         textViewHeart = (TextView) findViewById(R.id.textViewHeart);
         textViewPress = (TextView) findViewById(R.id.textViewPress);
-        textViewTitle = (TextView) findViewById(R.id.textView2);
-        textViewResult = (TextView) findViewById(R.id.textView7);
-        textViewTmpResult = (TextView) findViewById(R.id.textView3);
-        textViewHeartResult = (TextView) findViewById(R.id.textView5);
-        textViewPressResult = (TextView) findViewById(R.id.textView6);
 
         editTextHeart = (EditText) findViewById(R.id.editTextHeart);
         editTextTemp = (EditText) findViewById(R.id.editTextTemp);
         editTextPress = (EditText) findViewById(R.id.editTextPress);
-        editTextResult = (EditText) findViewById(R.id.editTextResult);
 
         buttonHeart = (Button) findViewById(R.id.buttonHeart);
         buttonTemp = (Button) findViewById(R.id.buttonTemp);
         buttonPress = (Button) findViewById(R.id.buttonPress);
         buttonResult = (Button) findViewById(R.id.buttonShow);
-        buttonBack = (Button) findViewById(R.id.buttonBack);
 
         buttonHeart.setEnabled(false);
         buttonTemp.setEnabled(false);
@@ -87,6 +81,8 @@ public class MainActivity extends AppCompatActivity {
         editTextHeart.setEnabled(false);
         editTextTemp.setEnabled(false);
         editTextPress.setEnabled(false);
+        buttonResult.setEnabled(false);
+
 
         SendService = Executors.newSingleThreadExecutor(); //创建单线程池，用于发送数据
 
@@ -106,11 +102,11 @@ public class MainActivity extends AppCompatActivity {
                     editTextHeart.setEnabled(false);
                     editTextTemp.setEnabled(false);
                     editTextPress.setEnabled(false);
+                    buttonResult.setEnabled(false);
 
                     try {
                         socket.close(); // 关闭连接
                         socket = null;
-                        buttonResult.setVisibility(View.VISIBLE);
                         Toast.makeText(MainActivity.this, "STM32断开", Toast.LENGTH_SHORT).show();
 
                     } catch (IOException e) {
@@ -121,81 +117,20 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
+        PersonInfo.getInstance(mContext).setHeartThreshold(String.valueOf(editTextHeart.getText()));
+        PersonInfo.getInstance(mContext).setPressThreshold(String.valueOf(editTextPress.getText()));
+        PersonInfo.getInstance(mContext).setTempThreshold(String.valueOf(editTextTemp.getText()));
+
         // 结果界面设置
         buttonResult.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
-                ConnectButton.setVisibility(View.GONE);
-                textViewTemperature.setVisibility(View.GONE);
-                textViewHeart.setVisibility(View.GONE);
-                textViewPress.setVisibility(View.GONE);
-                editTextResult.setVisibility(View.VISIBLE);
-                textViewResult.setVisibility(View.VISIBLE);
-
-                buttonHeart.setVisibility(View.GONE);
-                buttonTemp.setVisibility(View.GONE);
-                buttonPress.setVisibility(View.GONE);
-                buttonResult.setVisibility(View.GONE);
-                buttonBack.setVisibility(View.VISIBLE);
-
-                textViewTmpResult.setText("温度结果");
-                textViewHeartResult.setText("心率结果");
-                textViewPressResult.setText("血压结果");
-
-                boolean judgeTemp = Integer.valueOf(tempTemp[0]) > Integer.valueOf(tempThreshold) ? true : false;
-                boolean judgeHeart = Integer.valueOf(heartTemp[0]) > Integer.valueOf(heartThreshold) ? true : false;
-                boolean judgePress = Integer.valueOf(pressTemp[0]) > Integer.valueOf(pressThreshold) ? true : false;
-
-                if (judgeTemp) {
-                    textViewTemperature.setText("温度过高");
-                } else {
-                    textViewTemperature.setText("温度正常");
-                }
-
-                if (judgeHeart) {
-                    textViewHeart.setText("心率过高");
-                } else {
-                    textViewHeart.setText("心率正常");
-                }
-
-                if (judgePress) {
-                    textViewPress.setText("血压过高");
-                } else {
-                    textViewPress.setText("血压正常");
-                }
-
-                if (judgeHeart && judgePress && judgeTemp) {
-                    editTextResult.setText("身体优秀！");
-                }else if (!judgeHeart && !judgePress && !judgeTemp){
-                    editTextResult.setText("身体较差！");
-                }else {
-                    editTextResult.setText("身体良好！");
-                }
+                Intent intent = new Intent(MainActivity.this, ResultShowActivity.class);
+                startActivity(intent);
             }
         });
 
-        // 返回测量界面设置
-        buttonBack.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                ConnectButton.setVisibility(View.VISIBLE);
-                textViewTemperature.setVisibility(View.VISIBLE);
-                textViewHeart.setVisibility(View.VISIBLE);
-                textViewPress.setVisibility(View.VISIBLE);
-                editTextResult.setVisibility(View.GONE);
-                textViewResult.setVisibility(View.GONE);
 
-                buttonHeart.setVisibility(View.VISIBLE);
-                buttonTemp.setVisibility(View.VISIBLE);
-                buttonPress.setVisibility(View.VISIBLE);
-                buttonResult.setVisibility(View.VISIBLE);
-                buttonBack.setVisibility(View.GONE);
-
-                textViewTmpResult.setText("温度阈值");
-                textViewHeartResult.setText("心率阈值");
-                textViewPressResult.setText("血压阈值");
-            }
-        });
         //心率阈值设置
         buttonHeart.setOnClickListener(new OnClickListener() {
             @Override
@@ -204,7 +139,11 @@ public class MainActivity extends AppCompatActivity {
                     try {
                         if (null == socket) {
                         }
-                        heartThreshold = editTextHeart.getText().toString();
+                        String heartThreshold = editTextHeart.getText().toString();
+//                        Uri uriHeartThreshold = Uri.parse("content://com.example.tcpclientstm32.provider/string/person_info/heartThreshold");
+//                        values.put("heartThreshold", heartThreshold);
+//                        getContentResolver().update(uriHeartThreshold, values, null, null);
+                        PersonInfo.getInstance(mContext).setHeartThreshold(heartThreshold);
                         msg = "[H" + heartThreshold + "]";
                         Log.d(TAG, "Heart" + msg);//定义发送数据
                         if (socket.isConnected()) {
@@ -230,7 +169,11 @@ public class MainActivity extends AppCompatActivity {
                     try {
                         if (null == socket) {
                         }
-                        tempThreshold = editTextHeart.getText().toString();
+                        String tempThreshold = editTextHeart.getText().toString();
+//                        Uri uriHeartThreshold = Uri.parse("content://com.example.tcpclientstm32.provider/string/person_info/tempThreshold");
+//                        values.put("heartThreshold", tempThreshold);
+//                        getContentResolver().update(uriHeartThreshold, values, null, null);
+                        PersonInfo.getInstance(mContext).setTempThreshold(tempThreshold);
                         msg = "[T" + tempThreshold + "]";
                         Log.d(TAG, "Temp" + msg);
                         //定义发送数据
@@ -257,9 +200,12 @@ public class MainActivity extends AppCompatActivity {
                     try {
                         if (null == socket) {
                         }
-                        pressThreshold = editTextHeart.getText().toString();
+                        String pressThreshold = editTextHeart.getText().toString();
+//                        Uri uriPressThreshold = Uri.parse("content://com.example.tcpclientstm32.provider/string/person_info/pressThreshold");
+//                        values.put("heartThreshold", pressThreshold);
+//                        getContentResolver().update(uriPressThreshold, values, null, null);
+                        PersonInfo.getInstance(mContext).setPressThreshold(pressThreshold);
                         msg = "[P" + pressThreshold + "]";
-                        Log.d(TAG, "press" + msg);
                         //定义发送数据
                         if (socket.isConnected()) {
                             if (out != null) {
@@ -316,9 +262,10 @@ public class MainActivity extends AppCompatActivity {
                             editTextHeart.setEnabled(true);
                             editTextTemp.setEnabled(true);
                             editTextPress.setEnabled(true);
+                            buttonResult.setEnabled(true);
 
                             // 吐司一下，告诉用户发送成功
-                            Toast.makeText(MainActivity.this, "STM32连接成功", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(MainActivity.this, "监测设备连接成功", Toast.LENGTH_SHORT).show();
                         }
                     });
                     // 在创建完连接后启动接收线程
@@ -363,6 +310,10 @@ public class MainActivity extends AppCompatActivity {
                                 byte result[] = new byte[1024];
                                 int start = 0;
 
+                                String[] tempTemp = new String[1];
+                                String[] pressTemp = new String[1];
+                                String[] heartTemp = new String[1];
+
                                 for (int i = 0; i < buffer.length; i++) {
                                     if (start == 0 && buffer[i] == '[') {
                                         start++;
@@ -380,6 +331,10 @@ public class MainActivity extends AppCompatActivity {
                                                     e.printStackTrace();
                                                 }
                                                 tempTemp[0] = transferResult.substring(1, 6);
+                                                PersonInfo.getInstance(mContext).setTemp(tempTemp[0]);
+//                                                Uri uriTemp = Uri.parse("content://com.example.tcpclientstm32.provider/string/person_info/temp");
+//                                                values.put("temp", tempTemp[0]);
+//                                                getContentResolver().update(uriTemp, values, null, null);
                                                 textViewTemperature.setText("温度: " + tempTemp[0] + "℃");
                                                 break;
 
@@ -390,6 +345,11 @@ public class MainActivity extends AppCompatActivity {
                                                     e.printStackTrace();
                                                 }
                                                 heartTemp[0] = transferResult.substring(1, 6);
+                                                PersonInfo.getInstance(mContext).setHeart(heartTemp[0]);
+//                                                Uri uriHeart = Uri.parse("content://com.example.tcpclientstm32.provider/string/person_info/heart");
+//                                                values.put("heart", heartTemp[0]);
+//                                                getContentResolver().update(uriHeart, values, null, null);
+
                                                 textViewHeart.setText("心率: " + heartTemp[0] + "次/min");
                                                 break;
 
@@ -401,9 +361,12 @@ public class MainActivity extends AppCompatActivity {
                                                     e.printStackTrace();
                                                 }
                                                 pressTemp[0] = transferResult.substring(1, 6);
-                                                // 换算人体血压值需要*14
+                                                PersonInfo.getInstance(mContext).setPress(pressTemp[0]);
+//                                                Uri uriPress = Uri.parse("content://com.example.tcpclientstm32.provider/string/person_info/press");
+//                                                values.put("press", pressTemp[0]);
+//                                                getContentResolver().update(uriPress, values, null, null);
+
                                                 textViewPress.setText("血压: " + pressTemp[0] + "Kpa");
-//                                                textViewPress.setText("血压: " + transferResult.substring(1, 6) + "Kpa");
                                                 break;
 
                                             default:
@@ -419,8 +382,6 @@ public class MainActivity extends AppCompatActivity {
                     // TODO Auto-generated catch block
                     e.printStackTrace();
                 }
-//
-//                if ()
             }
         }
     }
